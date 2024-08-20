@@ -1,38 +1,29 @@
-# Sử dụng hình ảnh PHP chính thức
+# Sử dụng hình ảnh PHP với phiên bản phù hợp
 FROM php:8.1-fpm
 
-# Cài đặt các extension PHP cần thiết
-RUN docker-php-ext-install pdo pdo_mysql
-
-# Cài đặt các công cụ hệ thống cần thiết
+# Cài đặt các tiện ích bổ sung nếu cần thiết
 RUN apt-get update && apt-get install -y \
-    git \
-    unzip \
-    zip \
-    libzip-dev \
-    && docker-php-ext-install zip
+    nginx \
+    ...
 
 # Cài đặt Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
-# Sao chép mã nguồn vào container
-COPY . /var/www/html
+# Thiết lập thư mục làm việc
+WORKDIR /var/www
 
-# Đặt thư mục làm việc
-WORKDIR /var/www/html
+# Copy tất cả các file từ thư mục gốc vào container
+COPY . .
 
-# Xóa cache Composer trước khi cài đặt
-RUN composer clear-cache
+# Thiết lập quyền cho thư mục lưu trữ
+RUN chown -R www-data:www-data /var/www \
+    && chmod -R 755 /var/www/storage
 
-# Chạy lệnh composer install để cài đặt các gói phụ thuộc
-RUN composer install --ignore-platform-reqs --no-scripts --no-interaction --prefer-dist --optimize-autoloader --no-dev
+# Cấu hình Nginx để lắng nghe cổng từ biến môi trường
+COPY nginx.conf /etc/nginx/nginx.conf
 
-# Thiết lập quyền sở hữu và quyền truy cập cho thư mục
-RUN chown -R www-data:www-data /var/www/html \
-    && chmod -R 755 /var/www/html
-
-# Mở cổng 80 để lắng nghe các kết nối HTTP
+# Expose cổng mà ứng dụng sẽ lắng nghe
 EXPOSE 80
 
-# Khởi động PHP's built-in server trên cổng 80
-CMD ["php", "-S", "0.0.0.0:80", "-t", "/var/www/html"]
+# Khởi động cả PHP-FPM và Nginx
+CMD service php8.1-fpm start && nginx -g 'daemon off;'
