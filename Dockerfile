@@ -1,10 +1,13 @@
-# Sử dụng hình ảnh PHP với phiên bản phù hợp
+# Sử dụng hình ảnh PHP với phiên bản phù hợp, ví dụ như 8.1
 FROM php:8.1-fpm
 
-# Cài đặt các tiện ích bổ sung nếu cần thiết
+# Cài đặt các tiện ích bổ sung nếu cần thiết, ví dụ: các extension PHP
 RUN apt-get update && apt-get install -y \
-    nginx \
-    ...
+    libpng-dev \
+    libjpeg-dev \
+    libfreetype6-dev \
+    && docker-php-ext-configure gd --with-freetype --with-jpeg \
+    && docker-php-ext-install gd pdo pdo_mysql
 
 # Cài đặt Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
@@ -19,11 +22,14 @@ COPY . .
 RUN chown -R www-data:www-data /var/www \
     && chmod -R 755 /var/www/storage
 
-# Cấu hình Nginx để lắng nghe cổng từ biến môi trường
-COPY nginx.conf /etc/nginx/nginx.conf
+# Chạy các lệnh cần thiết như cài đặt thư viện và migration
+RUN composer install --no-dev --optimize-autoloader
+RUN php artisan migrate --force
+RUN php artisan config:cache
+RUN php artisan route:cache
 
 # Expose cổng mà ứng dụng sẽ lắng nghe
-EXPOSE 80
+EXPOSE 9000
 
-# Khởi động cả PHP-FPM và Nginx
-CMD service php8.1-fpm start && nginx -g 'daemon off;'
+# Chạy PHP-FPM
+CMD ["php-fpm"]
